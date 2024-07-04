@@ -1,0 +1,4 @@
+redis~=5.0.7
+fastapi~=0.111.0
+SQLAlchemy~=2.0.31
+asyncpg==0.29.0
