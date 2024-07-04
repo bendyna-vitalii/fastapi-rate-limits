@@ -13,23 +13,38 @@ and requirements versions, located in requirements.txt file
 
 ### Usage
 This module was build to use it as FastAPI dependency:
+
 ```python
-from fastapi import APIRouter, Depends
+import asyncio
+from fastapi import FastAPI, APIRouter, Depends
 from fastapi.responses import JSONResponse
 from FARLimits.FARLimits import FARLimits
 
-f_limits = FARLimits.initialize("localhost", 6379)
+class RateLimitsExample:
+    def __init__(self, rate_limiter: FARLimits):
+        self.rate_limiter = rate_limiter
+        self.api_router = APIRouter(prefix="/api/v1", tags=["Api version 1"])
+        self.api_router.add_api_route("/get/something",
+                             methods=["GET"],
+                             dependencies=[Depends(self.rate_limiter.check_limits)],
+                             endpoint=self.get_some_data
+                             )
 
-api_router = APIRouter(prefix="/api/v1", tags=["Api version 1"])
+    async def initialize(cls, redis_host: str, redis_port: int):
+        f_limits = await FARLimits.initialize(redis_host, redis_port)
+        return cls(f_limits)
+        
+    @staticmethod
+    async def get_some_data():
+        return JSONResponse(status_code=200, content={"success": True})
 
-async def get_some_data():
-    return JSONResponse(status_code=200, content={"success": True})
+async def main():
+    example = await RateLimitsExample.initialize("localhost", 6379)
+    app = FastAPI()
+    app.include_router(example.api_router)
 
-api_router.add_api_route("/get/something",
-                         methods=["GET"],
-                         dependencies=[Depends(f_limits.check_limits)],
-                         endpoint=get_some_data
-)
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Environment variables
@@ -42,7 +57,7 @@ This module supports these environment variables:
 Please note, that this module uses async methods to work with PostrgeSQL, so format of
 `POSTGRESURI` env var must be like this: `postgresql+asyncpg://<user>:<login>@<host>:<port>/<db_name>`
 
-### PostgewSQL database
+### PostgreSQL database
 If env var `POSTGRESURI` is set, then during initialization of module
 will be created table in database for changing rate limits for particular
 token. Also, it will add default number of allowed requests into this table with key `token`
